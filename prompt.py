@@ -38,8 +38,7 @@ class Prompt:
             prompt_class = {
                 'static': StaticPrompt
             }[template['mode']]
-
-            return prompt_class(template=template['template'], *args, **kwargs)
+            return prompt_class(template=template['template'], *args, **kwargs) 
         else:
             if not os.path.exists(name):
                 raise FileNotFoundError(f'Prompt {name} not found')
@@ -50,7 +49,7 @@ class Prompt:
     def _truncate_max_doc_length(self, document):
         if self. max_doc_length:
             document = self.tokenizer.decode(
-                self.tokenzier(document, truncation=True, max_length=self.max_doc_length)["input_ids"]
+                self.tokenizer(document, truncation=True, max_length=self.max_doc_length)["input_ids"]
             )
         return document
     
