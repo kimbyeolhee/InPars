@@ -3,6 +3,7 @@ import random
 import pandas as pd
 import urllib.error
 import torch
+import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from prompt import Prompt
 
@@ -31,7 +32,7 @@ class InPars:
             revision=None, # The specific model version to use(branch name, a tag name, or a commit id...)
             corpus='msmarco',
             prompt=None,
-            n_fewshot_example=None,
+            n_fewshot_examples=None,
             max_doc_length=None,
             max_query_length=None,
             max_prompt_length=None,
@@ -39,16 +40,14 @@ class InPars:
             fp16=False, # Use float16 precision to speed up inference
             int8=False, # Use int8 precision to speed up inference
             device =None,
-            tf=False,
             torch_compile=False, # Compile the model with torch.jit.script to speed up inference
-            verbose=False # Print out the model input and output
     ):
         self.corpus = corpus
         self.max_doc_length = max_doc_length
         self.max_query_length = max_query_length
         self.max_prompt_length = max_prompt_length
         self.max_new_tokens = max_new_tokens
-        self.n_fewshot_example = n_fewshot_example
+        self.n_fewshot_examples = n_fewshot_examples
         self.device = device
         if device is None:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -82,9 +81,15 @@ class InPars:
             max_query_length=self.max_query_length,
             max_doc_length=self.max_doc_length,
             max_prompt_length=self.max_prompt_length,
-            max_new_tokens=self.max_new_tokens
+            max_new_token=self.max_new_tokens
         )
     
     @torch.no_grad()
-    def generate(self):
-        pass
+    def generate(self, documents, doc_ids, batch_size=1, **generate_kwargs):
+        disable_pbar = False if len(documents) > 1_000 else True
+        prompts = [
+            self.prompter.build(document, n_examples=self.n_fewshot_examples)
+            for document in tqdm(documents, disable=disable_pbar, desc="Building prompts")
+        ]
+
+        print(len(prompts))
