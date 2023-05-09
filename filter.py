@@ -7,11 +7,11 @@ def read_synthetic_data(args):
     with open(args.input, "r") as f:
         for line in tqdm(f):
             row = json.loads(line.strip())
-            if len(row["log_probs"]) < args.min_tokens:
+            if len(row["log_probs"]) < args.min_tokens: # remove questions that are too short
                 continue
-            if len(row["log_probs"]) > args.max_tokens:
+            if len(row["log_probs"]) > args.max_tokens: # remove questions that are too long
                 continue
-            if args.skip_questions_copied_from_context:
+            if args.skip_questions_copied_from_context: # remove questions that were copied from the passage
                 if row["question"].lower() in row["doc_text"].lower():
                     continue
             rows.append(row)
