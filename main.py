@@ -7,7 +7,7 @@ from transformers import set_seed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--base_model', default='EleutherAI/gpt-j-6B')
+    parser.add_argument('--base_model', default='gpt2', help='EleutherAI/gpt-j-6B')
     parser.add_argument('--prompt', type=str, default="inpars",
                         help="Prompt type to be used during query generation: \
                         inpars, promptagator or custom")
@@ -26,14 +26,38 @@ if __name__ == "__main__":
     parser.add_argument('--fp16', action='store_true')
     parser.add_argument('--int8', action='store_true')
     parser.add_argument('--torch_compile', action='store_true')
-    parser.add_argument('--tf', action='store_true')
     parser.add_argument('--output', type=str, default="trec-covid-queries.jsonl")
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--device', type=str, default=None)
-    # parser.add_argument('--verbose', action='store_true')
     args = parser.parse_args()
     set_seed(args.seed)
 
     dataset = load_corpus(args.dataset, args.dataset_source)
-    print(len(dataset))
+    
+    if args.n_fewshot_examples >= len(dataset):
+        raise Exception(
+            f"Number of few-shot examples ({args.n_fewshot_examples}) must be less than the number of documents ({len(dataset)})"
+            )
+    
+    generator = InPars(
+        base_model=args.base_model,
+        revision=args.revision,
+        corpus=args.dataset,
+        prompt=args.prompt,
+        n_fewshot_examples=args.n_fewshot_examples,
+        max_doc_length=args.max_doc_length,
+        max_query_length=args.max_query_length,
+        max_prompt_length=args.max_prompt_length,
+        max_new_tokens=args.max_new_tokens,
+        fp16=args.fp16,
+        int8=args.int8,
+        device=args.device,
+        torch_compile=args.torch_compile,
+    )
 
+    generated = generator.generate(
+        documents=dataset['text'],
+        doc_ids=dataset['doc_id'],
+        batch_size=args.batch_size,
+    )    
+    
