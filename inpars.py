@@ -3,7 +3,7 @@ import random
 import pandas as pd
 import urllib.error
 import torch
-import tqdm
+from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from prompt import Prompt
 
@@ -83,13 +83,14 @@ class InPars:
             max_prompt_length=self.max_prompt_length,
             max_new_token=self.max_new_tokens
         )
+
     
     @torch.no_grad()
     def generate(self, documents, doc_ids, batch_size=1, **generate_kwargs):
         disable_pbar = False if len(documents) > 1_000 else True
+
         prompts = [
             self.prompter.build(document, n_examples=self.n_fewshot_examples)
             for document in tqdm(documents, disable=disable_pbar, desc="Building prompts")
         ]
 
-        print(len(prompts))
