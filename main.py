@@ -56,8 +56,14 @@ if __name__ == "__main__":
     )
 
     generated = generator.generate(
-        documents=dataset['text'],
-        doc_ids=dataset['doc_id'],
+        documents=dataset["text"],
+        doc_ids=dataset["doc_id"],
         batch_size=args.batch_size,
     )    
-    
+
+    dataset["query"] = [example["query"] for example in generated]
+    dataset["log_probs"] = [example["log_probs"] for example in generated]
+    dataset["prompt_text"] = [example["prompt_text"] for example in generated]
+    dataset["doc_text"] = [example["doc_text"] for example in generated]
+    dataset["fewshot_examples"] = [example["fewshot_examples"] for example in generated]
+    dataset.to_json(args.output, orient="records", lines=True)
