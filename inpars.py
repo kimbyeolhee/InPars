@@ -94,3 +94,67 @@ class InPars:
             for document in tqdm(documents, disable=disable_pbar, desc="Building prompts")
         ]
 
+        generate = self.model.generate
+        padding_kwargs = {}
+
+        results = []
+
+        for i in tqdm(range(0, len(prompts), batch_size), desc="Generating queries"):
+            batch_prompts = prompts[i:i + batch_size]
+            batch_docs = documents[i: i + batch_size]
+            batch_doc_ids = doc_ids[i:i + batch_size]
+
+            tokens = self.tokenizer(
+                batch_prompts,
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+                **padding_kwargs
+            )
+            tokens.to(self.device)
+
+            outputs = generate(
+                input_ids = tokens["input_ids"].long(),
+                attention_mask = tokens["attention_mask"].long(),
+                max_new_tokens = self.max_new_tokens,
+                output_scores = True,
+                return_dict = True,
+                return_dict_in_generate = True,
+                eos_token_id = 198,
+                bos_token_id = self.tokenizer.bos_token_id,
+                pad_token_id = self.tokenizer.pad_token_id,
+                **generate_kwargs
+            )
+             # outputs.sequence = torch.Size([1, 591])
+
+            preds = [
+                sequence.strip() for sequence in self.tokenizer.batch_decode(
+                    outputs.sequences[:, tokens["input_ids"].shape[-1]:],
+                    skip_special_tokens=True
+                )
+            ] # ['How many of the Salmonella serotypes are present in the human body?']
+
+            gen_sequences = outputs.sequences[:, tokens["input_ids"].shape[-1]:] # torch.size([1, 12])
+
+            pad_mask = (
+                outputs.sequences[:, tokens["input_ids"].shape[-1]:] == self.tokenizer.pad_token_id
+            )
+            probs = torch.stack(outputs.scores, dim=1).log_softmax(dim=-1) # torch.size([1, 12, 50257])
+
+            prob_values, prob_indices = probs.max(dim=2) # torch.size([1, 12])
+
+            sequence_scores = [prob_values[i][~pad_mask[i]].tolist()[:-1] for i in range(len(prob_values))]
+
+            for (question, log_probs, prompt_text, doc_id, document) in zip(preds, sequence_scores, batch_prompts, batch_doc_ids, batch_docs):
+                results.append(
+                    {
+                        "query": question,
+                        "log_probs": log_probs,
+                        "prompt_text" : prompt_text,
+                        "doc_id": doc_id,
+                        "doc_text": document,
+                        "fewshot_examples": [example[0] for example in self.fewshot_examples]
+                    }
+                )
+
+        return results
