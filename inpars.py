@@ -4,6 +4,7 @@ import pandas as pd
 import urllib.error
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from prompt import Prompt
 
 
 def load_examples(corpus, n_fewshot_examples):
@@ -74,3 +75,16 @@ class InPars:
         self.model.eval()
 
         self.fewshot_examples = load_examples(corpus, self.n_fewshot_examples)
+        self.prompter = Prompt.load(
+            name=prompt,
+            examples = self.fewshot_examples,
+            tokenizer=self.tokenizer,
+            max_query_length=self.max_query_length,
+            max_doc_length=self.max_doc_length,
+            max_prompt_length=self.max_prompt_length,
+            max_new_tokens=self.max_new_tokens
+        )
+    
+    @torch.no_grad()
+    def generate(self):
+        pass
