@@ -33,6 +33,8 @@ if __name__ == "__main__":
     set_seed(args.seed)
 
     dataset = load_corpus(args.dataset, args.dataset_source)
+    # only using 10000 datasets
+    dataset = dataset[:10000]
     
     if args.n_fewshot_examples >= len(dataset):
         raise Exception(
@@ -64,6 +66,6 @@ if __name__ == "__main__":
     dataset["query"] = [example["query"] for example in generated]
     dataset["log_probs"] = [example["log_probs"] for example in generated]
     dataset["prompt_text"] = [example["prompt_text"] for example in generated]
-    dataset["doc_text"] = [example["doc_text"] for example in generated]
+    dataset["doc_id"] = [example["doc_id"] for example in generated]
     dataset["fewshot_examples"] = [example["fewshot_examples"] for example in generated]
     dataset.to_json(args.output, orient="records", lines=True)
