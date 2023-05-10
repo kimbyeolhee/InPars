@@ -9,6 +9,9 @@ from prompt import Prompt
 
 
 def load_examples(corpus, n_fewshot_examples):
+    """
+    load exmaples for few-shot learning from huggingface datasets for DynamicPrompt
+    """
     try:
         df = pd.read_json(
             f'https://huggingface.co/datasets/inpars/fewshot-examples/resolve/main/data/{corpus}.json',

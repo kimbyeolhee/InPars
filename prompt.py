@@ -19,7 +19,7 @@ class Prompt:
             max_new_token=16,
     ):
         self.template = template
-        self.examples = examples
+        self.examples = examples # for dynamic prompt
         self.tokenizer = tokenizer
         self.max_doc_length = max_doc_length
         self.max_query_length = max_query_length
