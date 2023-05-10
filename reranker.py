@@ -96,17 +96,14 @@ class MonoT5Reranker(Reranker):
             output = self.model.generate(
                 **tokens, max_new_tokens=1, return_dict_in_generate=True, output_scores=True
             )
-            
-            # decode output
-            preds = self.tokenizer.batch_decode(output.sequences, skip_special_tokens=True)
-            print("😀")
-            print(preds)
+            # output : sequences, scores, encoder_hidden_states, encoder_attentions, cross_attentions, decoder_hidden_states
+            # decode(output) => ['false', 'false', 'false', 'true', 'true', 'true', 'true', 'true', 'false', 'false', 'true', 'true', 'false', 'false', 'false', 'true']
+            # output.scores.shape => (batch_size, sequence_length, vocab_size)
 
-
-            batch_scores = output.scores[0]
-            batch_scores = batch_scores[:, [self.token_false_id, self.token_true_id]]
-            batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
-            scores += batch_scores[:, 1].exp().tolist()
+            batch_scores = output.scores[0] # select the first batch # output.scores.shape => (batch_size, sequence_length, vocab_size) # why only the first batch? # because 
+            batch_scores = batch_scores[:, [self.token_false_id, self.token_true_id]] # select only the relevant and non-relevant scores
+            batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1) # normalize the scores
+            scores += batch_scores[:, 1].exp().tolist() # select the relevant scores and convert to probabilities
         
         return scores
 
