@@ -2,6 +2,8 @@ import json
 from tqdm import tqdm
 import argparse
 import numpy as np
+from reranker import Reranker
+from dataset import load_corpus
 
 def read_synthetic_data(args):
     rows = []
@@ -26,11 +28,11 @@ if __name__ == "__main__":
                         help="Dataset name from BEIR collection.")
     parser.add_argument('--dataset_source', default='ir_datasets',
                         help="The dataset source: ir_datasets or pyserini")
-    parser.add_argument("--filter_strategy", type=str, default="scores",
+    parser.add_argument("--filter_strategy", type=str, default="reranker",
                         help="Filtering strategy: scores or reranker.")
     parser.add_argument('--keep_top_k', type=int, default=1_000,
                         help='Write only top_k best scored query-doc pairs.')
-    parser.add_argument("--output", type=str, default="trec-covid-queries-filtered.jsonl",
+    parser.add_argument("--output", type=str, default="trec-covid-queries-filtered-reranker.jsonl",
                         help="Path to save the filtered queries.")
     parser.add_argument("--model_name_or_path", type=str,
                         default='castorini/monot5-3b-msmarco-10k', required=False,
@@ -53,13 +55,24 @@ if __name__ == "__main__":
 
     dataset = read_synthetic_data(args)
 
-    if args.filter_strategy == "scores":
+    if args.filter_strategy == "reranker":
         for line in tqdm(dataset):
             line["score"] = np.mean(line["log_probs"]) # mean of log probs
         else:
-            # rerank with lm
-            pass
-    
+            corpus = load_corpus(args.dataset, source=args.dataset_source)
+            corpus = dict(zip(corpus['doc_id'], corpus['text']))
+            model = Reranker.from_pretrained(
+                model_name_or_path=args.model_name_or_path,
+                batch_size=args.batch_size,
+                fp16=args.fp16,
+                device=args.device,
+                )
+            # score
+            query_scores = model.rescore([(synt_item["query"], corpus[synt_item["doc_id"]])for synt_item in dataset])
+            for idx, synt_item in enumerate(dataset):
+                synt_item["score"] = query_scores[idx]
+
+
     dataset.sort(key=lambda dataset: dataset["score"], reverse=True)
     with open(args.output, "w") as f:
         for row in dataset[:args.keep_top_k]:
