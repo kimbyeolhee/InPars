@@ -1,6 +1,7 @@
 import json
 from tqdm import tqdm
 import argparse
+import numpy as np
 
 def read_synthetic_data(args):
     rows = []
@@ -27,7 +28,7 @@ if __name__ == "__main__":
                         help="The dataset source: ir_datasets or pyserini")
     parser.add_argument("--filter_strategy", type=str, default="scores",
                         help="Filtering strategy: scores or reranker.")
-    parser.add_argument('--keep_top_k', type=int, default=10_000,
+    parser.add_argument('--keep_top_k', type=int, default=1_000,
                         help='Write only top_k best scored query-doc pairs.')
     parser.add_argument("--output", type=str, default="trec-covid-queries-filtered.jsonl",
                         help="Path to save the filtered queries.")
@@ -52,9 +53,14 @@ if __name__ == "__main__":
 
     dataset = read_synthetic_data(args)
 
-    print(dataset[0].keys())  
-    print("😎 doc_id : ", dataset[0]["doc_id"])
-    print("😎 text : ", dataset[0]["text"])
-    print("🙄 query: ", dataset[0]["query"])
-    print("😎 log_probs : ", dataset[0]["log_probs"])
-    print("😎 prompt_text : ", dataset[0]["prompt_text"])
+    if args.filter_strategy == "scores":
+        for line in tqdm(dataset):
+            line["score"] = np.mean(line["log_probs"]) # mean of log probs
+        else:
+            # rerank with lm
+            pass
+    
+    dataset.sort(key=lambda dataset: dataset["score"], reverse=True)
+    with open(args.output, "w") as f:
+        for row in dataset[:args.keep_top_k]:
+            f.write(json.dumps(row) + "\n")
