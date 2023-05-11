@@ -11,6 +11,21 @@ from transformers import (
     set_seed,
 )
 
+
+def split_triples(triples):
+    examples = {"label": [], "text": []}
+    for i in range(len(triples["query"])):
+        examples["text"].append(
+            f'Query: {triples["query"][i]} Document: {triples["positive"][i]} Relevant:'
+        )
+        examples["label"].append("true")
+        examples["text"].append(
+            f'Query: {triples["query"][i]} Document: {triples["negative"][i]} Relevant:'
+        )
+        examples["label"].append("false")
+    return examples
+
+
 if __name__ == "__main__":
     # args
 
