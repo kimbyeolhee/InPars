@@ -11,6 +11,9 @@ from dataset import load_corpus
 from pathlib import Path
 from pyserini.search.lucene import LuceneSearcher # Traditional lexical search
 
+import torch, gc
+gc.collect()
+torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -31,18 +34,10 @@ if __name__ == "__main__":
 
     corpus = load_corpus(args.dataset, args.dataset_source)
     index = f'beir-v1.0.0-{args.dataset}.flat'
-    index = "trec-covid-r1-full-text"
-
-    # only using 10000 datasets for testing
-    # corpus = corpus[:10000]
 
     # convert to {"doc_id" : "text"} format
     corpus = dict(zip(corpus["doc_id"], corpus["text"]))
 
-    # if os.path.isdir(index):
-    #     searcher = LuceneSearcher(index_dir=index)
-    # else:
-    #     searcher = LuceneSearcher.from_prebuilt_index(index)
     searcher = LuceneSearcher.from_prebuilt_index(index)
     
     n_no_query = 0
@@ -64,7 +59,7 @@ if __name__ == "__main__":
             tsv_writer.writerow([i, query]) # 0	Is Toxocara exposure associated with suicide attempts in psychiatric patients?
 
     tmp_run = f"{Path(args.output).parent}/tmp-run-{args.dataset}.txt"
-    print(f"😰, {Path(args.output).parent}/tmp-run-{args.dataset}.txt")
+
     if not os.path.exists(tmp_run):
         subprocess.run([
             'python3', '-m', 'pyserini.search.lucene',
@@ -75,7 +70,8 @@ if __name__ == "__main__":
                 '--output', tmp_run,
                 '--bm25',
         ])
-    
+
+
     results = {}
     with open(tmp_run) as f:
         for line in f:
@@ -114,5 +110,3 @@ if __name__ == "__main__":
 
     if n_docs_not_found > 0:
         print(f'{n_docs_not_found} docs returned by the search engine but not found in the corpus.')
-    
-    # index 매칭 문제 해결 안될 시 pyserini 라이브러리 말고 그냥 BM25로 직접 계산해보기
