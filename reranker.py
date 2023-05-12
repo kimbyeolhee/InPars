@@ -1,9 +1,17 @@
+import os
+import csv
+import torch
+import argparse
+import pandas as pd
+from math import ceil, exp
 from typing import List
 from tqdm.auto import tqdm
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from math import ceil, exp
 from utils import chunk
+from dataset import load_corpus, load_queries
+from utils import TRECRun
 
 # Based on https://github.com/castorini/pygaggle/blob/f54ae53d6183c1b66444fa5a0542301e0d1090f5/pygaggle/rerank/base.py#L63
 prediction_tokens = {
@@ -107,4 +115,72 @@ class MonoT5Reranker(Reranker):
         
         return scores
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default='./reranker/',
+            type=str, required=False, help="Reranker model.")
+    parser.add_argument("--input_run", default=None, type=str,
+                        help="Initial run to be reranked.")
+    parser.add_argument("--output_run", default="trec-covid-run.txt", type=str,
+                        help="Path to save the reranked run.")
+    parser.add_argument("--dataset", default="trec-covid", type=str,
+                        help="Dataset name from BEIR collection.")
+    parser.add_argument('--dataset_source', default='ir_datasets',
+                        help="The dataset source: ir_datasets or pyserini")
+    parser.add_argument("--corpus", default=None, type=str,
+                        help="Document collection `doc_id` and `text` fields in CSV format.")
+    parser.add_argument("--queries", default=None, type=str,
+                        help="Queries collection with `query_id` and `text` fields in CSV format.")
+    parser.add_argument("--device", default=None, type=str,
+                        help="CPU or CUDA device.")
+    parser.add_argument("--fp16", action="store_true",
+                        help="Whether to use FP16 weights during inference.")
+    parser.add_argument("--torch_compile", action="store_true",
+                        help="Whether to compile the model with `torch.compile`.")
+    parser.add_argument("--batch_size", default=16, type=int,
+                        help="Batch size for inference.")
+    parser.add_argument("--top_k", default=1_000, type=int,
+                        help="Top-k documents to be reranked for each query.")
+    args = parser.parse_args()
 
+    if args.dataset:
+        corpus = load_corpus(args.dataset, source=args.dataset_source)
+        corpus = dict(zip(corpus['doc_id'], corpus['text']))
+        queries = load_queries(args.dataset, source=args.dataset_source)
+    else:
+        if '.csv' in args.corpus:
+            corpus = pd.read_csv(args.corpus, index_col=0)
+            corpus.index = corpus.index.astype(str)
+            corpus = corpus.iloc[:, 0].to_dict()
+        elif '.json' in args.corpus:
+            corpus = pd.read_json(args.corpus, lines=True)
+            id_col, text_col = corpus.columns[:2]
+            corpus[id_col] = corpus[id_col].astype(str)
+            corpus = corpus.set_index(id_col)
+            corpus = corpus[text_col].to_dict()
+
+        if '.csv' in args.queries:
+            queries = pd.read_csv(args.queries, index_col=0)
+            queries.index = queries.index.astype(str)
+            queries = queries.iloc[:, 0].to_dict()
+        elif '.tsv' in args.queries:
+            queries = pd.read_csv(args.queries, header=None, sep='\t', index_col=0)
+            queries.index = queries.index.astype(str)
+            queries = queries.iloc[:, 0].to_dict()
+
+    input_run = args.input_run
+    if args.dataset and not args.input_run:
+        input_run = args.dataset
+
+    model = Reranker.from_pretrained(
+        model_name_or_path=args.model,
+        batch_size=args.batch_size,
+        fp16=args.fp16,
+        device=args.device,
+        torch_compile=args.torch_compile,
+        # torchscript=args.torchscript,
+    )
+
+    run = TRECRun(input_run)
+    run.rerank(model, queries, corpus, top_k=args.top_k)
+    run.save(args.output_run)
