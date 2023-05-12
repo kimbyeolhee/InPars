@@ -37,6 +37,25 @@ def load_corpus(dataset_name, source='ir_datasets'):
 
         return df
 
+
+def load_queries(dataset_name, source="ir_datsets"):
+    queries = {}
+
+    if source == "ir_datasets":
+        import ir_datasets
+        dataset = ir_datasets.load(f"beir/{dataset_name}")
+
+        for query in dataset.queries_iter():
+            queries[query.query_id] = ftfy.fix_text(query.text)
+    else:
+        from pyserini.search import get_topics
+
+        for (qid, data) in get_topics(f"beir-v1.0.0-{dataset_name}-test").items():
+            queries[str(qid)] = ftfy.fix_text(data["title"])
+    
+    return queries
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
